@@ -8,7 +8,7 @@ namespace HomeWork_09_SKP
 {
     public enum WeatherSearchState
     {
-        isOn,
-        isOff
+        IsOn,
+        IsOff
     }
 }

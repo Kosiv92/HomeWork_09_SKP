@@ -52,6 +52,9 @@ namespace HomeWork_09_SKP
 
         private Dictionary<long, UserState> _userState = new Dictionary<long, UserState>();
 
+        /// <summary>
+        /// Метод запуска приема обновлений от клиентов
+        /// </summary>
         public void StartReceiveUpdates()
         {
             using var cts = new CancellationTokenSource();
@@ -80,92 +83,108 @@ namespace HomeWork_09_SKP
             return Task.CompletedTask;
         }
 
+        /// <summary>
+        /// Метод обработки обновлений от пользователя
+        /// </summary>
+        /// <param name="botClient"></param>
+        /// <param name="update"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
         async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
+            Thread.Sleep(500);
+
             if (update.Type != UpdateType.Message) return;
 
             var chatId = update.Message.Chat.Id;
 
             ConsoleMethods.GetUpdateMessage(update, chatId);
 
-            if (_userState.ContainsKey(chatId))
-            {
-                UserState userState = _userState[chatId];
+            if (update.Message.Type != MessageType.Text) MessageHandler(update);
+            else TextHandler(update);
 
-                if (userState.WeatherSearchState == WeatherSearchState.isOn)
-                {
-                    WeatherHandler(update);
-                }
-                else if (userState.FileSendState == FileSendState.isOn)
-                {
-                    UploadHandler(update);
-                }
-                else MessageHandler(update);
-
-            }
-            else MessageHandler(update);
         }
 
         async private void MessageHandler(Update update)
         {
-            await _botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "Choose action", replyMarkup: GetButtons());
 
             switch (update.Message.Type)
             {
-                case MessageType.Text:
-                    //await _botClient.SendTextMessageAsync(chatId: update.Message.Chat.Id, text: "Received text:\n" + update.Message.Text);
-                    TextHandler(update);
-                    break;
                 case MessageType.Sticker:
                     SendSticker(update);
                     break;
                 case MessageType.Photo:
-                    SendPhoto(update);
+                    Repository.Download(_botClient, update);
                     break;
                 case MessageType.Document:
                     Repository.Download(_botClient, update);
                     break;
+                case MessageType.Audio:
+                    Repository.Download(_botClient, update);
+                    break;
             }
+
+
         }
 
         private void TextHandler(Update update)
         {
-            switch (update.Message.Text)
+
+            if (_userState.ContainsKey(update.Message.Chat.Id) && (_userState[update.Message.Chat.Id].WeatherSearchState == WeatherSearchState.IsOn || _userState[update.Message.Chat.Id].FileSendState == FileSendState.IsOn))
             {
-                case VideoText:
-                    SendVideo(update);
-                    break;
-                case SchoolText:
-                    SendReference(update);
-                    break;
-                case MusicText:
-                    SendMusic(update);
-                    break;
-                case AddressText:
-                    SendAddress(update);
-                    break;
-                case WeatherText:
-                    TurnOnWeatherSearch(update);
-                    break;
-                case UploadText:
-                    TurnOnFileUpload(update);
+                if (_userState[update.Message.Chat.Id].WeatherSearchState == WeatherSearchState.IsOn)
+                {
+                    WeatherHandler(update);
+                }
+                else if (_userState[update.Message.Chat.Id].FileSendState == FileSendState.IsOn)
+                {
                     UploadHandler(update);
-                    break;
+                }
             }
+            else
+            {
+                _botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "Choose action", replyMarkup: GetButtons());
+                switch (update.Message.Text)
+                {
+                    case VideoText:
+                        SendVideo(update);
+                        break;
+                    case SchoolText:
+                        SendReference(update);
+                        break;
+                    case MusicText:
+                        SendMusic(update);
+                        break;
+                    case AddressText:
+                        SendAddress(update);
+                        break;
+                    case WeatherText:
+                        TurnOnWeatherSearch(update);
+                        break;
+                    case UploadText:
+                        TurnOnFileUpload(update);
+                        break;
+                }
+            }
+
+
+
         }
 
         async private void TurnOnWeatherSearch(Update update)
         {
-            await _botClient.SendTextMessageAsync(chatId: update.Message.Chat.Id, text: "Write name of city which weather you need to know!", replyMarkup: new ReplyKeyboardMarkup("Cancel"));
-            _userState[update.Message.Chat.Id] = new UserState { WeatherSearchState = WeatherSearchState.isOn };
+            if (_userState.ContainsKey(update.Message.Chat.Id)) _userState[update.Message.Chat.Id].WeatherSearchState = WeatherSearchState.IsOn;
+            else _userState[update.Message.Chat.Id] = new UserState { WeatherSearchState = WeatherSearchState.IsOn };
+
+            _botClient.SendTextMessageAsync(chatId: update.Message.Chat.Id, text: "Write name of city which weather you need to know!", replyMarkup: new ReplyKeyboardMarkup("Cancel"));
         }
 
         private void WeatherHandler(Update update)
         {
             if (update.Message.Text == CancelText)
             {
-                _userState[update.Message.Chat.Id] = new UserState { WeatherSearchState = WeatherSearchState.isOff };
-                MessageHandler(update);
+                _userState[update.Message.Chat.Id].WeatherSearchState = WeatherSearchState.IsOff;
+                TextHandler(update);
             }
             else
             {
@@ -177,26 +196,26 @@ namespace HomeWork_09_SKP
         {
             string temperature = WeatherHerald.WeatherRequest(update.Message.Text);
             await _botClient.SendTextMessageAsync(chatId: update.Message.Chat.Id, text: temperature);
-            _userState[update.Message.Chat.Id] = new UserState { WeatherSearchState = WeatherSearchState.isOff };
         }
 
         async private void TurnOnFileUpload(Update update)
         {
-            _userState[update.Message.Chat.Id] = new UserState { FileSendState = FileSendState.isOn };
+            if (_userState.ContainsKey(update.Message.Chat.Id)) _userState[update.Message.Chat.Id].FileSendState = FileSendState.IsOn;
+            else _userState[update.Message.Chat.Id] = new UserState { FileSendState = FileSendState.IsOn };
         }
 
         async private void UploadHandler(Update update)
         {
-            FileInfo[] files = GetFilesName();
+            FileInfo[] files = Repository.GetFilesName();
 
             await _botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "Choose file to upload", replyMarkup: GetUploadButtons(files, numberOfFile));
 
             switch (update.Message.Text)
             {
                 case CancelText:
-                    _userState[update.Message.Chat.Id] = new UserState { FileSendState = FileSendState.isOff };
+                    _userState[update.Message.Chat.Id].FileSendState = FileSendState.IsOff;
                     numberOfFile = 0;
-                    MessageHandler(update);
+                    TextHandler(update);
                     break;
                 case PrevFileText:
                     if (numberOfFile > 0) numberOfFile--;
@@ -300,24 +319,24 @@ namespace HomeWork_09_SKP
         }
 
 
-        async private void TurnOnFileSender(Update update)
-        {
-            await _botClient.SendTextMessageAsync(chatId: update.Message.Chat.Id, text: "Choose file to upload!", replyMarkup: new ReplyKeyboardMarkup("Cancel"));
-            _userState[update.Message.Chat.Id] = new UserState { WeatherSearchState = WeatherSearchState.isOn };
-        }
+        //async private void TurnOnFileSender(Update update)
+        //{
+        //    await _botClient.SendTextMessageAsync(chatId: update.Message.Chat.Id, text: "Choose file to upload!", replyMarkup: new ReplyKeyboardMarkup("Cancel"));
+        //    _userState[update.Message.Chat.Id].WeatherSearchState = WeatherSearchState.isOn;
+        //}
 
 
-        private FileInfo[] GetFilesName()
-        {
-            DirectoryInfo d = new DirectoryInfo(pathToRepository);
-            FileInfo[] Files = d.GetFiles("*.pdf");
-            string str = "";
-            foreach (FileInfo file in Files)
-            {
-                str = str + ", " + file.Name;
-            }
-            return Files;
-        }
+        //private FileInfo[] GetFilesName()
+        //{
+        //    DirectoryInfo d = new DirectoryInfo(pathToRepository);
+        //    FileInfo[] Files = d.GetFiles("*.pdf");
+        //    string str = "";
+        //    foreach (FileInfo file in Files)
+        //    {
+        //        str = str + ", " + file.Name;
+        //    }
+        //    return Files;
+        //}
 
         private IReplyMarkup GetButtons()
         {

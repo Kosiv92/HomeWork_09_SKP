@@ -26,6 +26,8 @@ namespace HomeWork_09_SKP
 
             ConsoleMethods.GetUserInformation(telegramBot);
 
+            Repository.CreateRepoDirectory();
+
             telegramBot.StartReceiveUpdates();
 
         }              

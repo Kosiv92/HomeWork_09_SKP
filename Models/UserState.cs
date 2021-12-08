@@ -8,9 +8,9 @@
         
         public UserState()
         {
-            WeatherSearchState = WeatherSearchState.isOff;
+            WeatherSearchState = WeatherSearchState.IsOff;
 
-            FileSendState = FileSendState.isOff;
+            FileSendState = FileSendState.IsOff;
         }
 
         /// <summary>

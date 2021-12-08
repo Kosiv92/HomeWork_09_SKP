@@ -17,7 +17,9 @@ namespace HomeWork_09_SKP
     {
         //строка хранящая путь к репозиторию
         static readonly string pathToRepository = Environment.CurrentDirectory + "\\repo\\";
-                
+
+        static DirectoryInfo repoDirectory;
+
         /// <summary>
         /// Метод создания директории для загрузки/скачивания и хранения файлов, в случае если такой директории не существует
         /// </summary>
@@ -27,6 +29,9 @@ namespace HomeWork_09_SKP
             {
                 Directory.CreateDirectory(pathToRepository);
             }
+            
+            repoDirectory = new DirectoryInfo(pathToRepository);
+
         }
 
         /// <summary>
@@ -48,10 +53,10 @@ namespace HomeWork_09_SKP
         /// <param name="chatId">ID чата</param>
         static public async void Upload(TelegramBotClient botClient, string fileName, ChatId chatId)
         {
-            fileName = pathToRepository + "\\" + fileName;
+            fileName = pathToRepository + "\\" + fileName;                        
 
             try
-            {
+            {                
                 using (FileStream stream = System.IO.File.OpenRead(fileName))
                 {
                     InputOnlineFile inputOnlineFile = new InputOnlineFile(stream, fileName);
@@ -71,13 +76,46 @@ namespace HomeWork_09_SKP
         /// <param name="update">Передаваемый пользователем update содержащий файл</param>
         static public async void Download(TelegramBotClient botClient, Update update)
         {
-            string path = pathToRepository + update.Message.Document.FileName;
-            var file = await botClient.GetFileAsync(update.Message.Document.FileId);
+            Telegram.Bot.Types.File file;
+
+            string path = "";
+
+            switch (update.Message.Type)
+            {
+                case Telegram.Bot.Types.Enums.MessageType.Document:
+                    path = pathToRepository + update.Message.Document.FileName;
+                    file = await botClient.GetFileAsync(update.Message.Document.FileId);
+                    break;
+                case Telegram.Bot.Types.Enums.MessageType.Audio:
+                    path = pathToRepository + update.Message.Audio.FileName;
+                    file = await botClient.GetFileAsync(update.Message.Audio.FileId);
+                    break;
+                case Telegram.Bot.Types.Enums.MessageType.Video:
+                    path = pathToRepository + update.Message.Video.FileName;
+                    file = await botClient.GetFileAsync(update.Message.Video.FileId);
+                    break;
+                default:
+                    return;
+                    break;
+            }
+
             FileStream fs = new FileStream(path, FileMode.Create);
             await botClient.DownloadFileAsync(file.FilePath, fs);
             fs.Close();
 
             fs.Dispose();
+        }        
+
+        static public FileInfo[] GetFilesName()
+        {            
+            //FileInfo[] Files = repoDirectory.GetFiles("*.pdf");
+            FileInfo[] Files = repoDirectory.GetFiles();
+            string str = "";
+            foreach (FileInfo file in Files)
+            {
+                str = str + ", " + file.Name;
+            }
+            return Files;
         }
 
     }

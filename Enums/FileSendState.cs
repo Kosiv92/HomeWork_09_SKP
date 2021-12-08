@@ -8,7 +8,7 @@ namespace HomeWork_09_SKP
 {
     public enum FileSendState
     {
-        isOn,
-        isOff
+        IsOn,
+        IsOff
     }
 }
