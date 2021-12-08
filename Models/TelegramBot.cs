@@ -27,11 +27,10 @@ namespace HomeWork_09_SKP
 
         public TelegramBotClient BotClient { get => _botClient; }
 
-        const string DownloadText = "Download";
         const string VideoText = "Video";
         const string MusicText = "Music";
         const string SchoolText = "School";
-        const string AddressText = "Address";
+        const string ListText = "ShowList";
         const string WeatherText = "Weather";
         const string UploadText = "Upload";
         const string PrevFileText = "<";
@@ -47,9 +46,7 @@ namespace HomeWork_09_SKP
             _botClient = new TelegramBotClient(token);
 
         }
-
-        CancellationToken cts = new CancellationToken();
-
+                
         private Dictionary<long, UserState> _userState = new Dictionary<long, UserState>();
 
         /// <summary>
@@ -92,20 +89,21 @@ namespace HomeWork_09_SKP
         /// <returns></returns>
         async Task HandleUpdateAsync(ITelegramBotClient botClient, Update update, CancellationToken cancellationToken)
         {
-            Thread.Sleep(500);
-
+            
             if (update.Type != UpdateType.Message) return;
-
-            var chatId = update.Message.Chat.Id;
-
-            ConsoleMethods.GetUpdateMessage(update, chatId);
+                        
+            ConsoleMethods.GetUpdateMessage(update);
 
             if (update.Message.Type != MessageType.Text) MessageHandler(update);
             else TextHandler(update);
 
         }
 
-        async private void MessageHandler(Update update)
+        /// <summary>
+        /// Метод обработки обновлений от клиентов (для типов отличных от текстовых сообщений)
+        /// </summary>
+        /// <param name="update">Обновление от клиента</param>
+        private void MessageHandler(Update update)
         {
 
             switch (update.Message.Type)
@@ -127,7 +125,11 @@ namespace HomeWork_09_SKP
 
         }
 
-        private void TextHandler(Update update)
+        /// <summary>
+        /// Метод обработки обновлений от клиентов (для текстовых сообщений)
+        /// </summary>
+        /// <param name="update">Обновление от клиента</param>
+        async private void TextHandler(Update update)
         {
 
             if (_userState.ContainsKey(update.Message.Chat.Id) && (_userState[update.Message.Chat.Id].WeatherSearchState == WeatherSearchState.IsOn || _userState[update.Message.Chat.Id].FileSendState == FileSendState.IsOn))
@@ -143,7 +145,7 @@ namespace HomeWork_09_SKP
             }
             else
             {
-                _botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "Choose action", replyMarkup: GetButtons());
+                await _botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "Choose action", replyMarkup: GetButtons());                
                 switch (update.Message.Text)
                 {
                     case VideoText:
@@ -155,8 +157,8 @@ namespace HomeWork_09_SKP
                     case MusicText:
                         SendMusic(update);
                         break;
-                    case AddressText:
-                        SendAddress(update);
+                    case ListText:
+                        await _botClient.SendTextMessageAsync(update.Message.Chat.Id, text: GetFileList(update));
                         break;
                     case WeatherText:
                         TurnOnWeatherSearch(update);
@@ -171,19 +173,48 @@ namespace HomeWork_09_SKP
 
         }
 
+        /// <summary>
+        /// Метод получения списка файлов в репозитории 
+        /// </summary>
+        /// <param name="update">Обновление от клиента</param>
+        /// <returns></returns>
+        private string GetFileList(Update update)
+        {
+            FileInfo[] files = Repository.GetFilesName();
+            StringBuilder fileList = new StringBuilder();
+            foreach (var file in files)
+            {
+                fileList.Append($"- {file.Name}\n");
+            }
+
+            return fileList.ToString();
+
+        }
+
+        /// <summary>
+        /// Установка режима отправки данных о погоде клиенту
+        /// </summary>
+        /// <param name="update">Обновление от клиента</param>
         async private void TurnOnWeatherSearch(Update update)
         {
             if (_userState.ContainsKey(update.Message.Chat.Id)) _userState[update.Message.Chat.Id].WeatherSearchState = WeatherSearchState.IsOn;
             else _userState[update.Message.Chat.Id] = new UserState { WeatherSearchState = WeatherSearchState.IsOn };
+            //_userState[update.Message.Chat.Id] = new UserState { WeatherSearchState = WeatherSearchState.IsOn };
 
-            _botClient.SendTextMessageAsync(chatId: update.Message.Chat.Id, text: "Write name of city which weather you need to know!", replyMarkup: new ReplyKeyboardMarkup("Cancel"));
+            await _botClient.SendTextMessageAsync(chatId: update.Message.Chat.Id, text: "Write name of city which weather you need to know!", replyMarkup: new ReplyKeyboardMarkup("Cancel"));
         }
 
+        /// <summary>
+        /// Обработчик запросов погоды
+        /// </summary>
+        /// <param name="update">Обновление от клиента</param>
         private void WeatherHandler(Update update)
         {
+            
             if (update.Message.Text == CancelText)
             {
                 _userState[update.Message.Chat.Id].WeatherSearchState = WeatherSearchState.IsOff;
+                //_userState[update.Message.Chat.Id] = new UserState { WeatherSearchState = WeatherSearchState.IsOff };
                 TextHandler(update);
             }
             else
@@ -192,18 +223,33 @@ namespace HomeWork_09_SKP
             }
         }
 
+        /// <summary>
+        /// Метод отправки клиенту данных о температуре
+        /// </summary>
+        /// <param name="update"></param>
         async private void SendWeatherForecast(Update update)
         {
             string temperature = WeatherHerald.WeatherRequest(update.Message.Text);
             await _botClient.SendTextMessageAsync(chatId: update.Message.Chat.Id, text: temperature);
         }
 
+        /// <summary>
+        /// Установка режима отправки файлов клиенту
+        /// </summary>
+        /// <param name="update">Обновление от клиента</param>
         async private void TurnOnFileUpload(Update update)
         {
+            FileInfo[] files = Repository.GetFilesName();
             if (_userState.ContainsKey(update.Message.Chat.Id)) _userState[update.Message.Chat.Id].FileSendState = FileSendState.IsOn;
             else _userState[update.Message.Chat.Id] = new UserState { FileSendState = FileSendState.IsOn };
+            //_userState[update.Message.Chat.Id] = new UserState { FileSendState = FileSendState.IsOn };
+            await _botClient.SendTextMessageAsync(update.Message.Chat.Id, text: "Choose file to upload", replyMarkup: GetUploadButtons(files, numberOfFile));
         }
 
+        /// <summary>
+        /// Обработчик запросов на отправку файлов клиенту
+        /// </summary>
+        /// <param name="update">Обновление от клиента</param>
         async private void UploadHandler(Update update)
         {
             FileInfo[] files = Repository.GetFilesName();
@@ -214,6 +260,7 @@ namespace HomeWork_09_SKP
             {
                 case CancelText:
                     _userState[update.Message.Chat.Id].FileSendState = FileSendState.IsOff;
+                    //_userState[update.Message.Chat.Id] = new UserState { FileSendState = FileSendState.IsOff };
                     numberOfFile = 0;
                     TextHandler(update);
                     break;
@@ -232,38 +279,12 @@ namespace HomeWork_09_SKP
                     Repository.Upload(_botClient, update.Message.Text, update.Message.Chat.Id);
                     break;
             }
+        }                
 
-        }
-
-        //public async void Upload(string fileName, ChatId chatId)
-        //{
-        //    fileName = pathToRepository + "\\" + fileName;
-
-        //    try
-        //    {
-        //        using (FileStream stream = System.IO.File.OpenRead(fileName))
-        //        {
-        //            InputOnlineFile inputOnlineFile = new InputOnlineFile(stream, fileName);
-        //            await BotClient.SendDocumentAsync(chatId, inputOnlineFile);
-        //        }
-        //    }
-        //    catch (System.IO.FileNotFoundException)
-        //    {
-        //        await _botClient.SendTextMessageAsync(chatId: chatId, text: $"File \"{fileName}\" does not exists");
-        //    }
-        //}
-
-        //async void DownLoad(Update update)
-        //{
-        //    string path = pathToRepository + update.Message.Document.FileName;
-        //    var file = await BotClient.GetFileAsync(update.Message.Document.FileId);
-        //    FileStream fs = new FileStream(path, FileMode.Create);
-        //    await BotClient.DownloadFileAsync(file.FilePath, fs);
-        //    fs.Close();
-
-        //    fs.Dispose();
-        //}
-
+        /// <summary>
+        /// Метод отправки ссылки на интернет-ресурс (тест возможностей)
+        /// </summary>
+        /// <param name="update">Обновление от клиента</param>
         async private void SendReference(Update update)
         {
 
@@ -274,6 +295,10 @@ namespace HomeWork_09_SKP
 
         }
 
+        /// <summary>
+        /// Метод отправки аудиофайла (тест возможностей)
+        /// </summary>
+        /// <param name="update">Обновление от клиента</param>
         async private void SendMusic(Update update)
         {
             Message message = await _botClient.SendAudioAsync(
@@ -286,58 +311,30 @@ namespace HomeWork_09_SKP
                     */);
         }
 
+        /// <summary>
+        /// Метод отправки видеофайла (тест возможностей)
+        /// </summary>
+        /// <param name="update">Обновление от клиента</param>
         async private void SendVideo(Update update)
         {
             await _botClient.SendVideoAsync(chatId: update.Message.Chat.Id, video: "https://github.com/TelegramBots/book/raw/master/src/docs/video-bulb.mp4");
 
         }
-
-        async private void SendAddress(Update update)
-        {
-            Message message = await _botClient.SendVenueAsync(
-                    chatId: update.Message.Chat.Id,
-                    latitude: 56.287686f,
-                    longitude: 101.783908f,
-                    title: "Home of Siberia energy",
-                    address: "Bratsk, Russia");
-        }
-
+                
+        /// <summary>
+        /// Метод отправки стикера
+        /// </summary>
+        /// <param name="update">Обновление от клиента</param>
         async private void SendSticker(Update update)
         {
             await _botClient.SendTextMessageAsync(chatId: update.Message.Chat.Id, text: "Cool! Now check out mine!");
             await _botClient.SendStickerAsync(chatId: update.Message.Chat.Id, sticker: "https://tlgrm.ru/_/stickers/5a7/cb3/5a7cb3d0-bca6-3459-a3f0-5745d95d54b7/1.webp");
         }
 
-        async private void SendPhoto(Update update)
-        {
-            await _botClient.SendTextMessageAsync(chatId: update.Message.Chat.Id, text: "Not bad! I have one photo for you too!");
-            Message message = await _botClient.SendPhotoAsync(
-            chatId: update.Message.Chat.Id,
-            photo: "https://img1.goodfon.ru/wallpaper/nbig/a/e7/dzheyson-steytem-jason-statham-1317.jpg",
-            caption: "<b>Jason Statham</b>. <i>Source</i>: <a href=\"https://www.kinopoisk.ru/name/1514/\">Kinopoisk</a>",
-            parseMode: ParseMode.Html);
-        }
-
-
-        //async private void TurnOnFileSender(Update update)
-        //{
-        //    await _botClient.SendTextMessageAsync(chatId: update.Message.Chat.Id, text: "Choose file to upload!", replyMarkup: new ReplyKeyboardMarkup("Cancel"));
-        //    _userState[update.Message.Chat.Id].WeatherSearchState = WeatherSearchState.isOn;
-        //}
-
-
-        //private FileInfo[] GetFilesName()
-        //{
-        //    DirectoryInfo d = new DirectoryInfo(pathToRepository);
-        //    FileInfo[] Files = d.GetFiles("*.pdf");
-        //    string str = "";
-        //    foreach (FileInfo file in Files)
-        //    {
-        //        str = str + ", " + file.Name;
-        //    }
-        //    return Files;
-        //}
-
+        /// <summary>
+        /// Получение кнопок основного меню
+        /// </summary>
+        /// <returns></returns>
         private IReplyMarkup GetButtons()
         {
 
@@ -346,7 +343,7 @@ namespace HomeWork_09_SKP
                 Keyboard = new List<List<KeyboardButton>>
                 {
                     new List<KeyboardButton>{ new KeyboardButton { Text = VideoText }, new KeyboardButton { Text = MusicText } },
-                    new List<KeyboardButton>{ new KeyboardButton { Text = SchoolText }, new KeyboardButton { Text = AddressText } },
+                    new List<KeyboardButton>{ new KeyboardButton { Text = SchoolText }, new KeyboardButton { Text = ListText } },
                     new List<KeyboardButton>{ new KeyboardButton { Text = WeatherText }, new KeyboardButton { Text = UploadText } }
                     },
                 ResizeKeyboard = true
@@ -354,7 +351,12 @@ namespace HomeWork_09_SKP
         }
 
 
-
+        /// <summary>
+        /// Получение кнопок меню для скачивания файлов
+        /// </summary>
+        /// <param name="files">Список файлов репозитория</param>
+        /// <param name="position">Номер файла в списке (выбор для скачивания)</param>
+        /// <returns></returns>
         private IReplyMarkup GetUploadButtons(FileInfo[] files, int position)
         {
             string filename = files[position].Name;

@@ -14,9 +14,7 @@ using Telegram.Bot.Types.ReplyMarkups;
 namespace HomeWork_09_SKP
 {
     class Program
-    {
-        static TelegramBotClient bot;
-
+    {        
         static void Main(string[] args)
         {
 

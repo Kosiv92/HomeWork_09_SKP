@@ -43,9 +43,10 @@ namespace HomeWork_09_SKP
         /// </summary>
         /// <param name="update">Текстовое сообщение</param>
         /// <param name="chatId">ID чата</param>
-        public static void GetUpdateMessage(Update update, long chatId)
+        public static void GetUpdateMessage(Update update)
         {
-            Console.WriteLine($"Received a '{update.Message.Text}' message in chat {chatId}.");
+            
+            Console.WriteLine($"Received a '{update.Message.Text}' message in chat {update.Message.Chat.Id}.");
         }
 
     }

@@ -53,13 +53,13 @@ namespace HomeWork_09_SKP
         /// <param name="chatId">ID чата</param>
         static public async void Upload(TelegramBotClient botClient, string fileName, ChatId chatId)
         {
-            fileName = pathToRepository + "\\" + fileName;                        
+            string fullFileName = pathToRepository + "\\" + fileName;                        
 
             try
             {                
-                using (FileStream stream = System.IO.File.OpenRead(fileName))
+                using (FileStream stream = System.IO.File.OpenRead(fullFileName))
                 {
-                    InputOnlineFile inputOnlineFile = new InputOnlineFile(stream, fileName);
+                    InputOnlineFile inputOnlineFile = new InputOnlineFile(stream, fullFileName);
                     await botClient.SendDocumentAsync(chatId, inputOnlineFile);
                 }
             }
@@ -95,8 +95,7 @@ namespace HomeWork_09_SKP
                     file = await botClient.GetFileAsync(update.Message.Video.FileId);
                     break;
                 default:
-                    return;
-                    break;
+                    return;                    
             }
 
             FileStream fs = new FileStream(path, FileMode.Create);
@@ -109,13 +108,13 @@ namespace HomeWork_09_SKP
         static public FileInfo[] GetFilesName()
         {            
             //FileInfo[] Files = repoDirectory.GetFiles("*.pdf");
-            FileInfo[] Files = repoDirectory.GetFiles();
+            FileInfo[] files = repoDirectory.GetFiles();
             string str = "";
-            foreach (FileInfo file in Files)
+            foreach (FileInfo file in files)
             {
                 str = str + ", " + file.Name;
             }
-            return Files;
+            return files;
         }
 
     }

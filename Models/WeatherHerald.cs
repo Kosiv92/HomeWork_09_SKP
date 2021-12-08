@@ -9,12 +9,20 @@ using System.Threading.Tasks;
 
 namespace HomeWork_09_SKP
 {
+    /// <summary>
+    /// Класс получения данных о погоде
+    /// </summary>
     static class WeatherHerald
     {
         static string url = "http://api.openweathermap.org/data/2.5/weather?q=";
 
         static string keyAPI = "6fa095c114c44b8983cf448560847507";
 
+        /// <summary>
+        /// Запрос погоды по http
+        /// </summary>
+        /// <param name="city"></param>
+        /// <returns></returns>
         static public string WeatherRequest(string city)
         {
            
@@ -32,7 +40,7 @@ namespace HomeWork_09_SKP
 
                 httpWebResponse = (HttpWebResponse)httpWebRequest.GetResponse();
             }
-            catch (Exception e)
+            catch (Exception)
             {
                 return "Invalid input";
             }
@@ -49,12 +57,12 @@ namespace HomeWork_09_SKP
         }
 
     }
-
+        
     public class TemperatureInfo
     {
         public float Temp { get; set; }
     }
-
+        
     public class WeatherResponse
     {
         public TemperatureInfo Main { get; set; }
